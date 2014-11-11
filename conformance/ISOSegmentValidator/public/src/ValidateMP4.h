@@ -640,6 +640,9 @@ typedef struct {
 	
 	UInt32  visualProfileLevelIndication;// to validate if IOD corresponds to VSC
 
+    Boolean indexRange;
+    UInt64  indexRangeStart;
+    UInt64  indexRangeEnd;
 
 } ValidateGlobals;
 

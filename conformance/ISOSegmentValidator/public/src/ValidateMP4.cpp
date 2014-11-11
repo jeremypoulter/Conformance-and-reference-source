@@ -237,9 +237,9 @@ int main(void)
                 vg.dash264enc = true;
 		} else if ( keymatch( arg, "samplenumber", 1 ) ) {
 			getNextArgStr( &vg.samplenumberstr, "samplenumber" );
-
-
-
+        } else if ( keymatch( arg, "indexrange", 9 ) ) {
+            getNextArgStr( &temp, "indexrange" ); 
+            vg.indexRange = (2 == sscanf(temp, "%lld-%lld", &vg.indexRangeStart, &vg.indexRangeEnd));
 		} else {
 			fprintf( stderr, "Unexpected option \"%s\"\n", arg);
 			err = -1;
@@ -506,6 +506,7 @@ usageError:
 	fprintf( stderr, "                      most effective in combination with -atompath (default is all samples) \n" );
 	fprintf( stderr, "    -offsetinfo       <Offset Info File> - Partial file optimization information file: if the file has several byte ranges removed, this file provides the information as offset-bytes removed pairs\n");
 	fprintf( stderr, "    -logconsole       Redirect stdout and stderr to stdout.txt and stderr.txt, respectively \n");
+    fprintf( stderr, "    -indexrange       <start>-<end> - check the SIDX box is located at the specified byte range (inclusive)\n");
 	
 	fprintf( stderr, "    -h[elp] - print this usage message \n" );
 

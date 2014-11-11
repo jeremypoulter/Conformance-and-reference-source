@@ -2667,8 +2667,16 @@ OSErr Validate_sidx_Atom( atomOffsetEntry *aoe, void *refcon )
 
     if(tir->mediaTimeScale != sidxInfo->timescale)
         warnprint("sidx timescale %d != track timescale %d for track ID %d, Section 8.16.3.3 of ISO/IEC 14496-12 4th edition: it is recommended that this match the timescale of the reference stream or track\n",sidxInfo->timescale,tir->mediaTimeScale,sidxInfo->reference_ID);
-        
-	// Get data 
+
+    // Check the position of the sidx box if asked to
+    if(vg.indexRange && aoe->offset != vg.indexRangeStart)
+        errprint("sidx start offset does not match passed in value, expected %lld, actual %lld\n", vg.indexRangeStart, aoe->offset);
+
+    // Check the position of the sidx box if asked to, -1 as end position is inclusive
+    if(vg.indexRange && (aoe->maxOffset - 1) != vg.indexRangeStart)
+        errprint("sidx end offset does not match passed in value, expected %lld, actual %lld\n", vg.indexRangeEnd, aoe->maxOffset - 1);
+
+    // Get data 
 	if(version == 0)
 	{
 	    BAILIFERR( GetFileDataN32( aoe, &temp, offset, &offset ) );
