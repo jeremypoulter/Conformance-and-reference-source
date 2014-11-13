@@ -2,6 +2,8 @@
 [Bb]in/
 [Oo]bj/
 
+*.exe
+
 # mstest test results
 TestResults
 
@@ -47,4 +49,6 @@ ipch/
 # Linux build directories
 obj
 bin
-
+*.o
+*.a
+.depend
