@@ -2673,7 +2673,7 @@ OSErr Validate_sidx_Atom( atomOffsetEntry *aoe, void *refcon )
         errprint("sidx start offset does not match passed in value, expected %lld, actual %lld\n", vg.indexRangeStart, aoe->offset);
 
     // Check the position of the sidx box if asked to, -1 as end position is inclusive
-    if(vg.indexRange && (aoe->maxOffset - 1) != vg.indexRangeStart)
+    if(vg.indexRange && (aoe->maxOffset - 1) != vg.indexRangeEnd)
         errprint("sidx end offset does not match passed in value, expected %lld, actual %lld\n", vg.indexRangeEnd, aoe->maxOffset - 1);
 
     // Get data 
