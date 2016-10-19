@@ -233,7 +233,7 @@ int main(void)
     vg.lowerindexRange=-1;
     vg.higherindexRange=-1;
     //vg.indexRange='\0'; 
-		
+    
     char ** arrayArgc;
     int uArgc;
     expandArgv(argc,argv,uArgc,arrayArgc);   

@@ -2470,7 +2470,7 @@ OSErr Validate_trun_Atom( atomOffsetEntry *aoe, void *refcon )
 		    if(trunInfo->first_sample_flags_present && (i == 0))
                 trunInfo->sample_flags[0] = trunInfo->first_sample_flags;
             else
-			trunInfo->sample_flags[i] = trafInfo->default_sample_flags;
+			    trunInfo->sample_flags[i] = trafInfo->default_sample_flags;
 		}
 
         //Use it as a signed int when version is non-zero
@@ -2761,8 +2761,8 @@ OSErr Validate_sidx_Atom( atomOffsetEntry *aoe, void *refcon )
 
     if(tir->mediaTimeScale != sidxInfo->timescale)
         warnprint("sidx timescale %d != track timescale %d for track ID %d, Section 8.16.3.3 of ISO/IEC 14496-12 4th edition: it is recommended that this match the timescale of the reference stream or track\n",sidxInfo->timescale,tir->mediaTimeScale,sidxInfo->reference_ID);
-
-    // Get data 
+        
+	// Get data 
 	if(version == 0)
 	{
 	    BAILIFERR( GetFileDataN32( aoe, &temp, offset, &offset ) );
