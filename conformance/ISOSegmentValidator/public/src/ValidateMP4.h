@@ -44,8 +44,12 @@ limitations under the License.
 	#define TARGET_RT_BIG_ENDIAN 1
 #endif
 
+// VS2015 omits the following error if defined;
+// #error The C++ Standard Library forbids macroizing keywords. Enable warning C4005 to find the forbidden macro.
+#if !defined(_MSC_VER) || _MSC_VER < 1900
 #define true 1
 #define false 0
+#endif
 
 #define TYPE_LONGLONG 1
 
