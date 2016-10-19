@@ -135,6 +135,12 @@ OSErr ValidateFileAtoms( atomOffsetEntry *aoe, void *refcon )
 						Validate_uuid_Atom, cnt, list, nil );
 					if (!err) err = atomerr;
 					break;
+					
+            case 'emsg':
+                    atomerr = ValidateAtomOfType( 'emsg', 0, 
+                        Validate_emsg_Atom, cnt, list, nil );
+                    if (!err) err = atomerr;
+                    break;
                     
             case 'moof':
                     if(!vg.mir->fragmented)
@@ -359,7 +365,9 @@ OSErr Validate_minf_Atom( atomOffsetEntry *aoe, void *refcon )
 		default:
 			warnprint("WARNING: unknown media type '%s'\n",ostypetostr(tir->mediaType));
 	}
-
+                 //Explicit check for ac-4
+		if(!strcmp(vg.codecs, "ac-4") && strcmp(ostypetostr(tir->mediaType),"soun"))
+		    warnprint("Media Information Header Box should contain Sound Media Header Box for 'ac-4'\n" );	
 
 	// Process 'dinf' atoms
 	atomerr = ValidateAtomOfType( 'dinf', kTypeAtomFlagMustHaveOne | kTypeAtomFlagCanHaveAtMostOne, 
@@ -1162,6 +1170,7 @@ OSErr Validate_styp_Atom( atomOffsetEntry *aoe, void *refcon )
 		UInt32 ix;
 		OSType currentBrand;
 		Boolean majorBrandFoundAmongCompatibleBrands = false;
+		Boolean lmsgFoundInCompatibleBrands = false;
         bool msdhFound = false;
         bool msixFound = false;
 
@@ -1215,13 +1224,9 @@ OSErr Validate_styp_Atom( atomOffsetEntry *aoe, void *refcon )
 			}
             else if(currentBrand == 'lmsg') {
 				vg.dashSegment = true;
+				lmsgFoundInCompatibleBrands = true;
 				if(segmentFound && segmentNum != (vg.segmentInfoSize-1))
                     errprint("Brand 'lmsg' found as a compatible brand for segment number %d (not the last segment %d); violates Section 7.3.1. of ISO/IEC 23009-1:2012(E): In all cases for which a Representation contains more than one Media Segment ... If the Media Segment is not the last Media Segment in the Representation, the 'lmsg' compatibility brand shall not be present.\n",segmentNum+1,vg.segmentInfoSize);
-			}
-
-            if(segmentFound && (segmentNum == (vg.segmentInfoSize-1)) && vg.dash264base && (vg.dynamic || vg.isoLive) && currentBrand != 'lmsg') {
-				if(segmentFound && segmentNum != vg.segmentInfoSize)
-                    errprint("Brand 'lmsg' not found as a compatible brand for the last segment (number %d); violates Section 3.2.3. of Interoperability Point DASH264: If the MPD@type is equal to \"dynamic\" or if it includes MPD@profile attribute in-cludes \"urn:mpeg:dash:profile:isoff-live:2011\", then: if the Media Segment is the last Media Segment in the Representation, this Me-dia Segment shall carry the 'lmsg' compatibility brand\n",segmentNum+1);
 			}
 						
 		}
@@ -1230,7 +1235,12 @@ OSErr Validate_styp_Atom( atomOffsetEntry *aoe, void *refcon )
 				errprint("major brand ('%.4s') not also found in list of compatible brands\n", 
 						     ostypetostr_r(majorBrand,tempstr2));
 			}
-        
+
+		if (segmentFound && (segmentNum == (vg.segmentInfoSize - 1)) && (vg.dash264base || vg.dashifbase) && (vg.dynamic || vg.isoLive) && !lmsgFoundInCompatibleBrands) {
+			if (segmentFound && segmentNum != vg.segmentInfoSize)
+				warnprint("Brand 'lmsg' not found as a compatible brand for the last segment (number %d); violates Section 3.2.3. of Interoperability Point DASH264: If the MPD@type is equal to \"dynamic\" or if it includes MPD@profile attribute in-cludes \"urn:mpeg:dash:profile:isoff-live:2011\", then: if the Media Segment is the last Media Segment in the Representation, this Me-dia Segment shall carry the 'lmsg' compatibility brand\n", segmentNum + 1);
+		}
+
 		if (!msdhFound) {
 				errprint("Brand msdh not found as a compatible brand; violates Section 6.3.4.2. of ISO/IEC 23009-1:2012(E)\n");
 			}
@@ -1312,7 +1322,7 @@ OSErr Validate_moov_Atom( atomOffsetEntry *aoe, void *refcon )
     mir->fragmented = false; //unless 'mvex' is found in 'moov'
 
 	atomerr = ValidateAtomOfType( 'mvhd', kTypeAtomFlagMustHaveOne | kTypeAtomFlagCanHaveAtMostOne, 
-		Validate_mvhd_Atom, cnt, list, NULL);
+		Validate_mvhd_Atom, cnt, list, mir);
 	if (!err) err = atomerr;
 
 
@@ -1340,7 +1350,7 @@ OSErr Validate_moov_Atom( atomOffsetEntry *aoe, void *refcon )
 			}
 			//    need to pass info that this is a text track to ValidateAtomOfType 'trak' below (refcon arg doesn't seem to work)
 	
-// ¥¥¥¥
+// ï¿½ï¿½ï¿½ï¿½
 			++thisTrakIndex;
 		}
 	}
@@ -1360,7 +1370,7 @@ OSErr Validate_moov_Atom( atomOffsetEntry *aoe, void *refcon )
 				entry->aoeflags &= ~kAtomSkipThisAtom;
 			}
 
-// ¥¥¥¥
+// ï¿½ï¿½ï¿½ï¿½
 			++thisTrakIndex;
 		}
 	}
@@ -1413,7 +1423,7 @@ OSErr Validate_moov_Atom( atomOffsetEntry *aoe, void *refcon )
 				break;
 				
 			case 'wide':	// this guy is QuickTime specific
-			// ¥¥ if !qt, mpeg may be unfamiliar
+			// ï¿½ï¿½ if !qt, mpeg may be unfamiliar
 				break;
 				
 			default:
@@ -2166,7 +2176,7 @@ OSErr Validate_moovhnti_Atom( atomOffsetEntry *aoe, void *refcon )
 
 		switch (entry->type) {
 			default:
-			// ¥¥ should warn
+			// ï¿½ï¿½ should warn
 				break;
 		}
 		

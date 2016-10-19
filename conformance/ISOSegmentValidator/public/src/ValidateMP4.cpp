@@ -19,6 +19,12 @@ limitations under the License.
 
 
 #include "ValidateMP4.h"
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string.h>
+#include "stdio.h"
+#include "stdlib.h"
 #if STAND_ALONE_APP
 	#include "console.h"
 #endif
@@ -38,6 +44,8 @@ ValidateGlobals vg = {0};
 
 
 static int keymatch (const char * arg, const char * keyword, int minchars);
+
+void expandArgv(int srcArgc, const char** srcArgV, int &dstArgc, const char** &dstArgv);   
 
 //#define STAND_ALONE_APP 1  //  #define this if you're using a source level debugger (i.e. Visual C++ in Windows)
 							  //  also, near the beginning of main(), hard-code your arguments (e.g. your test file)
@@ -70,12 +78,78 @@ static int keymatch (const char * arg, const char * keyword, int minchars)
   return true;			/* A-OK */
 }
 
+void writeEntry(char* srcPtr, int &srcIndex, char* &dstPtr, int &dstIndex, int maxArgc)
+{
+    if(dstIndex >= maxArgc)
+    {
+        fprintf(stderr,"May number of config arguments %d overshot, exiting!\n",maxArgc);
+        exit(-1);
+    }
+    dstPtr = (char*)(malloc((strlen(srcPtr) + 1) * sizeof(char)));  //allocate memory for each row
+    strcpy(dstPtr,srcPtr);
+
+    srcIndex++;
+    dstIndex++;
+    return;
+}
+
+void expandArgv(int srcArgc, char** srcArgV, int &dstArgc, char** &dstArgv)
+{  
+#define maxArgc 255
+
+  dstArgv= (char**)malloc(sizeof(char*) * maxArgc);		//allocate memory for no. of rows
+  
+  int dstIndex = 0;
+  
+  for (int srcIndex = 0 ; ; )					//read line from text file
+  {
+  
+    if(strcmp(srcArgV[srcIndex],"-configfile") == 0)
+    {
+        srcIndex++;
+        
+        FILE* f = fopen( srcArgV[srcIndex], "r" );          //location of text file to be opened specified by str 
+        if(f == NULL)
+        {
+            fprintf(stderr,"-configfile %s used, file not found, exiting!\n",srcArgV[srcIndex]);
+            exit(-1);
+        }
+
+        srcIndex++;
+        
+        char line[ 1000 ];
+                        
+        while (fgets( line, 1000, f ))                 //read line from text file
+        {
+          char * pch;
+          pch = strtok(line,"\n, ");                  //remove \n character and space
+          pch=strtok(pch," ");
+
+          int dummy;
+          writeEntry(pch,dummy,dstArgv[dstIndex],dstIndex,maxArgc); //Dont change srcIndex any further 
+        }
+        
+        fclose(f);        
+    }
+    else
+        writeEntry(srcArgV[srcIndex],srcIndex,dstArgv[dstIndex],dstIndex,maxArgc);
+
+    if(srcIndex >= srcArgc) //All src args processed
+    {
+        dstArgc = dstIndex;
+        break;
+    }
+  }
+  
+  return;
+}
+
 //==========================================================================================
 //_MSL_IMP_EXP_C extern int ccommand(char ***);
 
 #define getNextArgStr( _str_, _str_err_str_ ) \
 		argn++; \
-		arg = argv[argn]; \
+		arg = arrayArgc[argn]; \
 		if( nil == arg ) \
 		{ \
 			fprintf( stderr, "Expected " _str_err_str_ " got end of args\n" ); \
@@ -140,6 +214,9 @@ int main(void)
     vg.checkSubSegAlignment = false;
     vg.minBufferTime = -1;
     vg.bandwidth = -1;
+    vg.width = 0;
+    vg.height = 0;
+    vg.audioChValue = 0;
     vg.suggestBandwidth = false;
     vg.isoLive = false;
     vg.isoondemand = false;
@@ -149,13 +226,24 @@ int main(void)
     vg.subRepLevel = false;
     vg.startWithSAP = -1;
     vg.dash264base = false;
+    vg.dashifbase = false;
     vg.dash264enc = false;
+    vg.RepresentationIndex = false;
     vg.numOffsetEntries = 0;
+    vg.lowerindexRange=-1;
+    vg.higherindexRange=-1;
+    //vg.indexRange='\0'; 
+		
+    char ** arrayArgc;
+    int uArgc;
+    expandArgv(argc,argv,uArgc,arrayArgc);   
+    
 		
 	// Check the parameters
-	for( argn = 1; argn < argc; argn++ )
+	for( argn = 1; argn < uArgc ; argn++ )
 	{
-		const char *arg = argv[argn];
+		const char *arg = arrayArgc[argn];	     //instead of reading from argv[], now read from array
+		//const char * arg=argv[argn];
 		
 		if( '-' != arg[0] )
 		{
@@ -219,6 +307,8 @@ int main(void)
                 vg.isomain = true;
         } else if ( keymatch( arg, "dynamic", 7 ) ) {
                 vg.dynamic = true;
+        } else if ( keymatch( arg, "indexrange", 10 ) ) {
+                getNextArgStr( &vg.indexRange, "indexrange" );	  			  
         } else if ( keymatch( arg, "level", 5 ) ) {
                 vg.subRepLevel = true;
         } else if ( keymatch( arg, "startwithsap", 6 ) ) {
@@ -233,19 +323,42 @@ int main(void)
 			logConsole = true;
         } else if ( keymatch( arg, "dash264base", 11 ) ) {
                 vg.dash264base = true;
+        } else if ( keymatch( arg, "dashifbase", 10 ) ) {
+                vg.dashifbase = true;
         } else if ( keymatch( arg, "dash264enc", 10 ) ) {
                 vg.dash264enc = true;
+        } else if ( keymatch( arg, "repIndex", 1 ) ) {
+                vg.RepresentationIndex = true;
 		} else if ( keymatch( arg, "samplenumber", 1 ) ) {
 			getNextArgStr( &vg.samplenumberstr, "samplenumber" );
-        } else if ( keymatch( arg, "indexrange", 9 ) ) {
-            getNextArgStr( &temp, "indexrange" ); 
-            vg.indexRange = (2 == sscanf(temp, "%lld-%lld", &vg.indexRangeStart, &vg.indexRangeEnd));
+
+		} else if ( keymatch( arg, "width", 5 ) ) {
+                          getNextArgStr( &temp, "width" ); vg.width = atoi(temp);
+                } else if ( keymatch( arg, "height", 6 ) ) {
+                          getNextArgStr( &temp, "height" ); vg.height = atoi(temp);
+		} else if ( keymatch( arg, "codecs", 6 ) ) {
+                          getNextArgStr( &vg.codecs, "codecs" ); 
+	        } else if ( keymatch( arg, "audiochvalue", 12 ) ) {
+                         getNextArgStr( &temp, "audiochvalue" ); vg.audioChValue = atoi(temp);
+                 		  			  
 		} else {
 			fprintf( stderr, "Unexpected option \"%s\"\n", arg);
 			err = -1;
 			goto usageError;
 		}
 	}
+	
+	for(int i = 0; i < uArgc; i++)		
+	{
+	  char * currentPtr = arrayArgc[i];
+	  free(currentPtr);			//free the memory allocated by malloc in doubleduplicateArgv
+	}
+	
+	free(arrayArgc);
+	
+	
+	if (vg.indexRange!='\0')
+	  sscanf (vg.indexRange,"%d-%d",&vg.lowerindexRange,&vg.higherindexRange);
 	
 
 	//=====================
@@ -317,6 +430,11 @@ int main(void)
         fprintf( stderr, "minBufferTime and bandwidth must be provided together as options!\n" );
         goto usageError;
     }
+    if((vg.width == 0) != (vg.height == 0))
+    {
+        fprintf( stderr, "width and height must be provided together as options!\n" );
+        goto usageError;
+    }
 
 	if (vg.samplenumberstr[0] == 0) {
 		vg.samplenumber = 0;			// zero means print them all if you print any
@@ -349,7 +467,6 @@ int main(void)
 	vg.inOffset = 0;
 	err = fseek(infile, 0, SEEK_END);
 	if (err) goto bail;
-//	UInt64 tttemp = ftell(infile);
 	vg.inMaxOffset = inflateOffset(ftell(infile));
 	if (vg.inMaxOffset < 0) {
 		err = vg.inMaxOffset;
@@ -470,7 +587,7 @@ int main(void)
 
 usageError:
 	fprintf( stderr, "Usage: %s [-filetype <type>] "
-								"[-printtype <options>] [-checklevel <level>] [-infofile <Segment Info File>] [-leafinfo <Leaf Info File>] [-segal] [-ssegal] [-startwithsap TYPE] [-level] [-bss] [-isolive] [-isoondemand] [-isomain] [-dynamic] [-dash264base] [-dash264enc]", "ValidateMP4" );
+								"[-printtype <options>] [-checklevel <level>] [-infofile <Segment Info File>] [-leafinfo <Leaf Info File>] [-segal] [-ssegal] [-startwithsap TYPE] [-level] [-bss] [-isolive] [-isoondemand] [-isomain] [-dynamic] [-dash264base] [-dashifbase] [-dash264enc][-repIndex]", "ValidateMP4" );
 	fprintf( stderr, " [-samplenumber <number>] [-verbose <options>] [-offsetinfo <Offset Info File>] [-logconsole ] [-help] inputfile\n" );
 	fprintf( stderr, "    -a[tompath]      <atompath> - limit certain operations to <atompath> (e.g. moov-1:trak-2)\n" );
 	fprintf( stderr, "                     this effects -checklevel and -printtype (default is everything) \n" );
@@ -492,6 +609,8 @@ usageError:
 	fprintf( stderr, "    -ssegal -         Check Subegment alignment based on <Leaf Info File>\n" );
 	fprintf( stderr, "    -bandwidth        For checking @bandwidth/@minBufferTime\n" );
 	fprintf( stderr, "    -minbuffertime    For checking @bandwidth/@minBufferTime\n" );
+	fprintf( stderr, "    -width            For checking width\n" );
+	fprintf( stderr, "    -height           For checking height\n" );
 	fprintf( stderr, "    -sbw              Suggest a good @bandwidth if the one provided is non-conforming\n" );
 	fprintf( stderr, "    -isolive          Make checks specific for media segments conforming to ISO Base media file format live profile\n" );
 	fprintf( stderr, "    -isoondemand      Make checks specific for media segments conforming to ISO Base media file format On Demand profile\n" );
@@ -501,7 +620,12 @@ usageError:
 	fprintf( stderr, "    -level            SubRepresentation@level checks\n" );
 	fprintf( stderr, "    -bss              Make checks specific for bitstream switching\n" );
 	fprintf( stderr, "    -dash264base      Make checks specific for DASH264 Base IOP\n" );
+	fprintf( stderr, "    -dashifbase      Make checks specific for DASHIF Base IOP\n" );
 	fprintf( stderr, "    -dash264enc       Make checks specific for encrypted DASH264 content\n" );
+	fprintf( stderr, "    -repIndex         Make checks specific for @RepresentationIndex");
+	fprintf( stderr, "    -indexrange       Byte range where sidx is expected\n");
+	fprintf( stderr, "    -width            Expected width of the video track\n");
+	fprintf( stderr, "    -height           Expected height of the video track\n");
 	fprintf( stderr, "    -s[amplenumber]   <number> - limit sample checking or printing operations to sample <number> \n" );
 	fprintf( stderr, "                      most effective in combination with -atompath (default is all samples) \n" );
 	fprintf( stderr, "    -offsetinfo       <Offset Info File> - Partial file optimization information file: if the file has several byte ranges removed, this file provides the information as offset-bytes removed pairs\n");

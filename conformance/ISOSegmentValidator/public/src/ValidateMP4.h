@@ -518,6 +518,7 @@ typedef struct {
     UInt32  processedFragments;
     UInt32  sequence_number;
     UInt64  fragment_duration;
+	UInt32  mvhd_timescale;
 
 	long			numTIRs;
 	TrackInfoRec	tirList[1];
@@ -596,6 +597,13 @@ typedef struct {
     int  startWithSAP;
     long double  minBufferTime;
     SInt64  bandwidth;
+    unsigned int  width;
+    unsigned int  height;
+    argstr codecs;
+    argstr indexRange;
+    int lowerindexRange;
+    int higherindexRange;
+    unsigned int audioChValue;
 	bool	suggestBandwidth;
     bool    isoLive;
     bool    isoondemand;
@@ -604,7 +612,9 @@ typedef struct {
     bool    subRepLevel;
     bool    bss;
     bool    dash264base;
+    bool    dashifbase;
     bool    dash264enc;
+    bool    RepresentationIndex;
     unsigned int  numControlTracks;
     unsigned int  *numControlLeafs;
     LeafInfo **controlLeafInfo;
@@ -639,11 +649,6 @@ typedef struct {
 	Boolean	print_hintpayload;
 	
 	UInt32  visualProfileLevelIndication;// to validate if IOD corresponds to VSC
-
-    Boolean indexRange;
-    UInt64  indexRangeStart;
-    UInt64  indexRangeEnd;
-
 } ValidateGlobals;
 
 extern ValidateGlobals vg;
@@ -980,6 +985,7 @@ OSErr Validate_trun_Atom( atomOffsetEntry *aoe, void *refcon );
 
 OSErr Validate_sbgp_Atom( atomOffsetEntry *aoe, void *refcon );
 OSErr Validate_sgpd_Atom( atomOffsetEntry *aoe, void *refcon );
+OSErr Validate_emsg_Atom( atomOffsetEntry *aoe, void *refcon );
 OSErr Validate_tfdt_Atom( atomOffsetEntry *aoe, void *refcon );
 OSErr Validate_sidx_Atom( atomOffsetEntry *aoe, void *refcon );
 
@@ -1116,6 +1122,7 @@ typedef OSErr (*ValidateBitstreamProcPtr)( BitBuffer *bb, void *refcon );
 
 OSErr Validate_ESDAtom( atomOffsetEntry *aoe, void *refcon, ValidateBitstreamProcPtr validateBitstreamProc, char *esname );
 OSErr Validate_mp4_SD_Entry( atomOffsetEntry *aoe, void *refcon, ValidateBitstreamProcPtr validateBitstreamProc, char *esname );
+OSErr Validate_mhaC_Atom( atomOffsetEntry *aoe, void *refcon );
 
 OSErr Validate_avcC_Atom( atomOffsetEntry *aoe, void *refcon, char *esname );
 OSErr Validate_btrt_Atom( atomOffsetEntry *aoe, void *refcon, char *esname );

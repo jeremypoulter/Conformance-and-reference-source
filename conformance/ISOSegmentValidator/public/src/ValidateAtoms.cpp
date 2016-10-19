@@ -20,6 +20,9 @@ limitations under the License.
 
 #include "ValidateMP4.h"
 
+#include "string.h"
+#include "stdio.h"
+#include "stdlib.h"
 
 extern ValidateGlobals vg;
 
@@ -98,9 +101,9 @@ bail:
 //==========================================================================================
 
 typedef struct MovieHeaderCommonRecord {
-    Fixed                           preferredRate;              // must be 1.0 for mp4
+    Fixed                           rate;              // must be 1.0 for mp4
 
-    SInt16                          preferredVolume;           	// must be 1.0 for mp4
+    SInt16                          volume;           	// must be 1.0 for mp4
     short                           reserved1;					// must be 0
 
     long                            preferredLong1;				// must be 0 for mp4
@@ -136,13 +139,13 @@ typedef struct MovieHeaderVers1Record {
 	
 OSErr Validate_mvhd_Atom( atomOffsetEntry *aoe, void *refcon )
 {
-#pragma unused(refcon)
 	OSErr err = noErr;
 	UInt32 version;
 	UInt32 flags;
 	UInt64 offset;
 	MovieHeaderVers1Record	mvhdHead;
 	MovieHeaderCommonRecord	mvhdHeadCommon;
+	MovieInfoRec	*mir = (MovieInfoRec	*)refcon;
 	
 	// Get version/flags
 	BAILIFERR( GetFullAtomVersionFlags( aoe, &version, &flags, &offset ) );
@@ -172,8 +175,8 @@ OSErr Validate_mvhd_Atom( atomOffsetEntry *aoe, void *refcon )
 	}
 	
 	BAILIFERR( GetFileData( aoe, &mvhdHeadCommon, offset, sizeof(mvhdHeadCommon), &offset ) );
-    mvhdHeadCommon.preferredRate = EndianU32_BtoN(mvhdHeadCommon.preferredRate);
-    mvhdHeadCommon.preferredVolume = EndianS16_BtoN(mvhdHeadCommon.preferredVolume);
+    mvhdHeadCommon.rate = EndianU32_BtoN(mvhdHeadCommon.rate);
+    mvhdHeadCommon.volume = EndianS16_BtoN(mvhdHeadCommon.volume);
     mvhdHeadCommon.reserved1 = EndianS16_BtoN(mvhdHeadCommon.reserved1);
     mvhdHeadCommon.preferredLong1 = EndianS32_BtoN(mvhdHeadCommon.preferredLong1);
     mvhdHeadCommon.preferredLong2 = EndianS32_BtoN(mvhdHeadCommon.preferredLong2);
@@ -195,19 +198,21 @@ OSErr Validate_mvhd_Atom( atomOffsetEntry *aoe, void *refcon )
 	atomprint("nextTrackID=\"%ld\"\n", mvhdHeadCommon.nextTrackID);
 	atomprint("/>\n"); 
 
+	mir->mvhd_timescale = mvhdHead.timeScale;    //Used for edit lists
+
 	// Check required field values
-	FieldMustBe( mvhdHeadCommon.preferredRate, 0x00010000, "'mhvd' preferredRate must be 0x%lx not 0x%lx" );
-	FieldMustBe( mvhdHeadCommon.preferredVolume, 0x0100, "'mhvd' preferredVolume must be 0x%lx not 0x%lx" );
-	FieldMustBe( mvhdHeadCommon.reserved1, 0, "'mhvd' has a non-zero reserved field, should be %d is %d" );
-	FieldMustBe( mvhdHeadCommon.reserved1, 0, "'mhvd' has a non-zero reserved field, should be %d is %d" );
-	FieldMustBe( mvhdHeadCommon.preferredLong1, 0, "'mhvd' has a non-zero reserved field, should be %d is %d" );
-	FieldMustBe( mvhdHeadCommon.preferredLong2, 0, "'mhvd' has a non-zero reserved field, should be %d is %d" );
-	FieldMustBe( mvhdHeadCommon.previewTime, 0, "'mhvd' has a non-zero reserved field, should be %d is %d" );
-	FieldMustBe( mvhdHeadCommon.previewDuration, 0, "'mhvd' has a non-zero reserved field, should be %d is %d" );
-	FieldMustBe( mvhdHeadCommon.posterTime, 0, "'mhvd' has a non-zero reserved field, should be %d is %d" );
-	FieldMustBe( mvhdHeadCommon.selectionTime, 0, "'mhvd' has a non-zero reserved field, should be %d is %d" );
-	FieldMustBe( mvhdHeadCommon.selectionDuration, 0, "'mhvd' has a non-zero reserved field, should be %d is %d" );
-	FieldMustBe( mvhdHeadCommon.currentTime, 0, "'mhvd' has a non-zero reserved field, should be %d is %d" );
+	FieldMustBe( mvhdHeadCommon.rate, 0x00010000, "'mvhd' rate must be 0x%lx not 0x%lx" );
+	FieldMustBe( mvhdHeadCommon.volume, 0x0100, "'mvhd' volume must be 0x%lx not 0x%lx" );
+	FieldMustBe( mvhdHeadCommon.reserved1, 0, "'mvhd' has a non-zero reserved field, should be %d is %d" );
+	FieldMustBe( mvhdHeadCommon.reserved1, 0, "'mvhd' has a non-zero reserved field, should be %d is %d" );
+	FieldMustBe( mvhdHeadCommon.preferredLong1, 0, "'mvhd' has a non-zero reserved field, should be %d is %d" );
+	FieldMustBe( mvhdHeadCommon.preferredLong2, 0, "'mvhd' has a non-zero reserved field, should be %d is %d" );
+	FieldMustBe( mvhdHeadCommon.previewTime, 0, "'mvhd' has a non-zero reserved field, should be %d is %d" );
+	FieldMustBe( mvhdHeadCommon.previewDuration, 0, "'mvhd' has a non-zero reserved field, should be %d is %d" );
+	FieldMustBe( mvhdHeadCommon.posterTime, 0, "'mvhd' has a non-zero reserved field, should be %d is %d" );
+	FieldMustBe( mvhdHeadCommon.selectionTime, 0, "'mvhd' has a non-zero reserved field, should be %d is %d" );
+	FieldMustBe( mvhdHeadCommon.selectionDuration, 0, "'mvhd' has a non-zero reserved field, should be %d is %d" );
+	FieldMustBe( mvhdHeadCommon.currentTime, 0, "'mvhd' has a non-zero reserved field, should be %d is %d" );
 		
 	BAILIFERR( CheckMatrixForUnity( mvhdHeadCommon.matrix ) );
 
@@ -328,7 +333,7 @@ OSErr Validate_tkhd_Atom( atomOffsetEntry *aoe, void *refcon )
 	FieldMustBe( tkhdHeadCommon.alternateGroup, 0, "'tkhd' alternateGroup must be %d not %d" );
 	FieldMustBe( tkhdHeadCommon.reserved, 0, "'tkhd' reserved must be %d not %d" );
 	
-	// ¥¥¥¥ CHECK for audio/video
+	// ï¿½ï¿½ï¿½ï¿½ CHECK for audio/video
 	{
 		FieldMustBeOneOf2( tkhdHeadCommon.volume, SInt16, "'tkhd' volume must be set to one of ", (0, 0x0100) );
 		if( vg.majorBrand == brandtype_mp41 ){
@@ -349,6 +354,16 @@ OSErr Validate_tkhd_Atom( atomOffsetEntry *aoe, void *refcon )
 
 
 	// All done
+		// Check whether height and width are matching with those from MPD
+		if(EndianS16_BtoN(EndianS32_NtoB(tkhdHeadCommon.trackWidth)) != vg.width)
+		{ 
+		  errprint("Width in TrackHeaderBox is not matching with out of box width information \n");
+		}
+		if(EndianS16_BtoN(EndianS32_NtoB(tkhdHeadCommon.trackHeight))!= vg.height)
+		{ 
+		  errprint("Height in TrackHeaderBox is not matching with out of box height information \n");
+		}
+		
 	aoe->aoeflags |= kAtomValidated;
 
 bail:
@@ -508,6 +523,10 @@ OSErr Validate_mdia_hdlr_Atom( atomOffsetEntry *aoe, void *refcon )
 			"'hdlr' handler type must be be one of ", 
 			('odsm', 'crsm', 'sdsm', 'vide', 'soun', 'm7sm', 'ocsm', 'ipsm', 'mjsm', 'hint') );
 
+		//Explicit check for ac-4
+		if(!strcmp(vg.codecs, "ac-4") && strcmp(ostypetostr(hdlrInfo->componentSubType),"soun"))
+		    warnprint("handler_type is not 'soun', 'soun' is expected for 'ac-4'\n" );	
+	
 	tir->hdlrInfo = hdlrInfo;
 	// All done
 	atomprint("/>\n"); 
@@ -723,7 +742,7 @@ OSErr Validate_nmhd_Atom( atomOffsetEntry *aoe, void *refcon )
 	atomprintnotab("\tversion=\"%d\" flags=\"%d\"\n", version, flags);
 	atomprint("/>\n"); 
 
-//¥¥¥¥¥ need to check for underrun
+//ï¿½ï¿½ï¿½ï¿½ï¿½ need to check for underrun
 
 	// Check required field values
 	FieldMustBe( flags, 0, "'nmhd' flags must be %d not 0x%lx" );
@@ -800,8 +819,8 @@ OSErr Validate_url_Entry( atomOffsetEntry *aoe, void *refcon )
 	atomprint("/>\n"); 
 
 	// Check required field values
-//¥¥¥	FieldMustBe( flags, 0, "'mp4s' flags must be 0" );
-//¥¥¥   need to check that the atom has ended.
+//ï¿½ï¿½ï¿½	FieldMustBe( flags, 0, "'mp4s' flags must be 0" );
+//ï¿½ï¿½ï¿½   need to check that the atom has ended.
 
 	// All done
 	aoe->aoeflags |= kAtomValidated;
@@ -844,8 +863,8 @@ OSErr Validate_urn_Entry( atomOffsetEntry *aoe, void *refcon )
 	atomprint("/>\n"); 
 
 	// Check required field values
-//¥¥¥	FieldMustBe( flags, 0, "'mp4s' flags must be 0" );
-//¥¥¥   need to check that the atom has ended.
+//ï¿½ï¿½ï¿½	FieldMustBe( flags, 0, "'mp4s' flags must be 0" );
+//ï¿½ï¿½ï¿½   need to check that the atom has ended.
 
 	// All done
 	aoe->aoeflags |= kAtomValidated;
@@ -909,7 +928,7 @@ OSErr Validate_dref_Atom( atomOffsetEntry *aoe, void *refcon )
 					break;
 					
 				default:
-				// ¥¥ should warn
+				// ï¿½ï¿½ should warn
 					warnprint("WARNING: unknown/unexpected dref entry '%s'\n",ostypetostr(entry->type));
 					atomprint("???? />\n");
 					break;
@@ -2068,7 +2087,7 @@ OSErr Validate_vide_SD_Entry( atomOffsetEntry *aoe, void *refcon )
 	atomprint("name =\"%s\"\n", vsdi.name);
 	atomprint("depth =\"%hd\"\n", vsdi.depth);
 	atomprint("clutID =\"%hd\"\n", vsdi.clutID);
-		FieldMustBeOneOf3( sdh.sdType, OSType, "SampleDescription sdType must be 'mp4v' or 'avc1'", ('mp4v', 'avc1', 'encv') );
+		FieldMustBeOneOf4( sdh.sdType, OSType, "SampleDescription sdType must be 'mp4v', 'avc1', 'encv', or 'hev1'", ('mp4v', 'avc1', 'encv', 'hev1') );
 		
 	FieldMustBe( sdh.resvd1, 0, "SampleDescription resvd1 must be %d not %d" );
 	FieldMustBe( sdh.resvdA, 0, "SampleDescription resvd1 must be %d not %d" );
@@ -2447,7 +2466,12 @@ OSErr Validate_trun_Atom( atomOffsetEntry *aoe, void *refcon )
         if(trunInfo->sample_flags_present)
             BAILIFERR( GetFileDataN32( aoe, &trunInfo->sample_flags[i], offset, &offset ) );
 		else
+		{
+		    if(trunInfo->first_sample_flags_present && (i == 0))
+                trunInfo->sample_flags[0] = trunInfo->first_sample_flags;
+            else
 			trunInfo->sample_flags[i] = trafInfo->default_sample_flags;
+		}
 
         //Use it as a signed int when version is non-zero
         if(trunInfo->sample_composition_time_offsets_present)
@@ -2570,6 +2594,56 @@ bail:
 
 }
 
+
+//==========================================================================================
+
+OSErr Validate_emsg_Atom( atomOffsetEntry *aoe, void *refcon )
+{
+	OSErr err = noErr;
+	UInt32 version;
+	UInt32 flags;
+	UInt64 offset;
+	char *scheme_id_uri = nil;
+	char *value = nil;
+    UInt32  timescale;
+    UInt32  presentation_time_delta;
+    UInt32  event_duration;
+    UInt32  id;
+    UInt8  *message_data;    
+    //TrafInfoRec *trafInfo = (TrafInfoRec *)refcon;
+    
+	// Get version/flags
+	BAILIFERR( GetFullAtomVersionFlags( aoe, &version, &flags, &offset ) );
+    
+    if(version != 0)
+        errprint("version = 0 for emsg box according to Section 5.10.3.3.3 of ISO/IEC 23009-1:2013(E)\n");
+        
+    if(flags != 0)
+        errprint("flags = 0 for emsg box according to Section 5.10.3.3.3 of ISO/IEC 23009-1:2013(E)\n");
+
+    BAILIFERR( GetFileCString( aoe, &scheme_id_uri, offset, aoe->maxOffset - offset, &offset ) );
+    
+    BAILIFERR( GetFileCString( aoe, &value, offset, aoe->maxOffset - offset, &offset ) );
+
+	// Get data 
+	BAILIFERR( GetFileDataN32( aoe, &timescale, offset, &offset ) );
+	
+	BAILIFERR( GetFileDataN32( aoe, &presentation_time_delta, offset, &offset ) );
+	
+	BAILIFERR( GetFileDataN32( aoe, &event_duration, offset, &offset ) );
+	
+	BAILIFERR( GetFileDataN32( aoe, &id, offset, &offset ) );
+
+	message_data = new UInt8[aoe->maxOffset - offset];
+	BAILIFERR( GetFileData( aoe,message_data, offset, aoe->maxOffset - offset , &offset ) );
+    
+    // All done
+	aoe->aoeflags |= kAtomValidated;
+bail:
+	return err;
+
+}
+
 //==========================================================================================
 
 
@@ -2651,6 +2725,26 @@ OSErr Validate_sidx_Atom( atomOffsetEntry *aoe, void *refcon )
     sidxInfo->offset = aoe->offset;
     sidxInfo->size = aoe->size;
     
+    /*for the index range, verify that 
+  sidxInfo->offset > starting of index range && 
+  sidxInfo->offset + sidxInfo->size - 1 < ending of index range */
+    
+  int offs=sidxInfo->offset;       //convert to int value and store it in a variable
+  int siz=sidxInfo->size;
+  
+  
+  if (vg.lowerindexRange!=-1 && vg.higherindexRange!=-1)
+  {
+    if (offs < vg.lowerindexRange || (offs + siz - 1 ) > vg.higherindexRange)
+      //fprintf(stdout,"%d  %d\n",vg.lowerindexRange,vg.higherindexRange);
+      errprint("sidx offset %d is less than starting of indexRange %d, OR sum of sidx offset %d and sidx size %d minus 1 is greater than ending of indexRange %d\n",offs,vg.lowerindexRange,offs,siz,vg.higherindexRange);
+  
+  }else
+  {   //indexRange missing, check if it's a IOP test vector without @RepresentationIndex
+      if (vg.dash264base && !vg.RepresentationIndex)
+        errprint("sidx present without indexRange and @RepresentationIndex for IOP test vector\n");
+  }
+    
 	// Get version/flags
 	BAILIFERR( GetFullAtomVersionFlags( aoe, &version, &flags, &offset ) );
     
@@ -2667,14 +2761,6 @@ OSErr Validate_sidx_Atom( atomOffsetEntry *aoe, void *refcon )
 
     if(tir->mediaTimeScale != sidxInfo->timescale)
         warnprint("sidx timescale %d != track timescale %d for track ID %d, Section 8.16.3.3 of ISO/IEC 14496-12 4th edition: it is recommended that this match the timescale of the reference stream or track\n",sidxInfo->timescale,tir->mediaTimeScale,sidxInfo->reference_ID);
-
-    // Check the position of the sidx box if asked to
-    if(vg.indexRange && aoe->offset != vg.indexRangeStart)
-        errprint("sidx start offset does not match passed in value, expected %lld, actual %lld\n", vg.indexRangeStart, aoe->offset);
-
-    // Check the position of the sidx box if asked to, -1 as end position is inclusive
-    if(vg.indexRange && (aoe->maxOffset - 1) != vg.indexRangeEnd)
-        errprint("sidx end offset does not match passed in value, expected %lld, actual %lld\n", vg.indexRangeEnd, aoe->maxOffset - 1);
 
     // Get data 
 	if(version == 0)
@@ -2739,7 +2825,7 @@ typedef struct SoundSampleDescriptionInfo {
 	SInt16		sampleSize;                 /* number of bits per sample */
 	SInt16		compressionID;              /* unused. set to zero. */
 	SInt16		packetSize;                 /* unused. set to zero. */
-	UInt32		sampleRate;					/*¥¥¥ UnsignedFixed ¥¥¥*/ /* sample rate sound is captured at */
+	UInt32		sampleRate;					/*ï¿½ï¿½ï¿½ UnsignedFixed ï¿½ï¿½ï¿½*/ /* sample rate sound is captured at */
 } SoundSampleDescriptionInfo;
 
 OSErr Validate_soun_SD_Entry( atomOffsetEntry *aoe, void *refcon )
@@ -2782,9 +2868,9 @@ OSErr Validate_soun_SD_Entry( atomOffsetEntry *aoe, void *refcon )
 	atomprint(">\n"); //vg.tabcnt++; 
 
 	// Check required field values
-	FieldMustBeOneOf2( sdh.sdType, OSType, "SampleDescription sdType must be 'mp4a' or 'enca' ", ( 'mp4a', 'enca' ) );
+	FieldMustBeOneOf4( sdh.sdType, OSType, "SampleDescription sdType must be 'mp4a' or 'enca' or 'ac-4' or 'mha1' ", ( 'mp4a', 'enca','ac-4', 'mha1' ) );
 	
-	if( (sdh.sdType != 'mp4a') && (sdh.sdType != 'enca') && !fileTypeKnown ){	
+	if( (sdh.sdType != 'mp4a') && (sdh.sdType != 'enca') && (sdh.sdType != 'ac-4') && (sdh.sdType != 'mha1') && !fileTypeKnown ){	
 			warnprint("WARNING: Don't know about this sound descriptor type \"%s\"\n", 
 				ostypetostr(sdh.sdType));
 			// goto bail;
@@ -2838,6 +2924,9 @@ OSErr Validate_soun_SD_Entry( atomOffsetEntry *aoe, void *refcon )
 				BAILIFERR( Validate_sinf_Atom( entry, refcon, kTypeAtomFlagMustHaveOne ) );
 				--vg.tabcnt; atomprint("</sinf>\n");
 			}				
+			else if (entry->type == 'mhaC' ){
+			        BAILIFERR( Validate_mhaC_Atom( entry, refcon)); 
+			}
 			
 			else warnprint("Warning: Unknown atom found \"%s\": audio sample descriptions would not normally contain this\n",ostypetostr(entry->type));
 			
@@ -2866,7 +2955,7 @@ OSErr Validate_hint_SD_Entry( atomOffsetEntry *aoe, void *refcon )
 	// Get data 
 	BAILIFERR( GetFileData( aoe, &sdh, offset, sizeof(sdh), &offset ) );
 	EndianSampleDescriptionHead_BtoN( &sdh );
-//¥¥¥Êhow to cope with hint data
+//ï¿½ï¿½ï¿½ï¿½how to cope with hint data
 	
 	// Print atom contents non-required fields
 	atomprint("sdType=\"%s\"\n", ostypetostr(sdh.sdType));
@@ -2877,7 +2966,7 @@ OSErr Validate_hint_SD_Entry( atomOffsetEntry *aoe, void *refcon )
 	FieldMustBe( sdh.resvd1, 0, "SampleDescription resvd1 must be %d not 0x%lx" );
 	FieldMustBe( sdh.resvdA, 0, "SampleDescription resvd1 must be %d not 0x%lx" );
 	
-//¥¥¥ hint data
+//ï¿½ï¿½ï¿½ hint data
 	
 	// All done
 	aoe->aoeflags |= kAtomValidated;
@@ -2899,7 +2988,7 @@ OSErr Validate_mp4_SD_Entry( atomOffsetEntry *aoe, void *refcon, ValidateBitstre
 	// Get data 
 	BAILIFERR( GetFileData( aoe, &sdh, offset, sizeof(sdh), &offset ) );
 	EndianSampleDescriptionHead_BtoN( &sdh );
-//¥¥¥Êhow to cope with hint data
+//ï¿½ï¿½ï¿½ï¿½how to cope with hint data
 	
 	// Print atom contents non-required fields
 	atomprint("sdType=\"%s\"\n", ostypetostr(sdh.sdType));
@@ -2951,6 +3040,48 @@ bail:
 
 
 
+
+
+//==========================================================================================
+
+typedef struct MHADecoderConfigurationRecord {
+      UInt8	configurationVersion;
+      UInt8	mpegh3daProfileLevelIndication;
+      UInt8	referenceChannelLayout;
+      UInt16	mpegh3daConfigLength;
+      UInt32    mpegh3daConfig;
+ }MHADecoderConfigurationRecord;
+
+OSErr Validate_mhaC_Atom( atomOffsetEntry *aoe, void *refcon)
+{
+        TrackInfoRec *tir = (TrackInfoRec *)refcon;
+	OSErr err = noErr;
+	UInt64 offset;
+		
+	offset = aoe->offset + aoe->atomStartSize;
+	MHADecoderConfigurationRecord mhaDecoderConfigurationRecord;
+        //errprint( "offset= %d\n",offset );
+
+	BAILIFERR( GetFileData( aoe, &mhaDecoderConfigurationRecord.configurationVersion , offset, sizeof(mhaDecoderConfigurationRecord.configurationVersion), &offset ) );	
+	BAILIFERR( GetFileData( aoe, &mhaDecoderConfigurationRecord.mpegh3daProfileLevelIndication , offset, sizeof(mhaDecoderConfigurationRecord.mpegh3daProfileLevelIndication), &offset ) );	
+	BAILIFERR( GetFileData( aoe, &mhaDecoderConfigurationRecord.referenceChannelLayout , offset, sizeof(mhaDecoderConfigurationRecord.referenceChannelLayout) , &offset ) );
+	BAILIFERR( GetFileData( aoe, &mhaDecoderConfigurationRecord.mpegh3daConfigLength, offset, sizeof(mhaDecoderConfigurationRecord.mpegh3daConfigLength), &offset ) );	
+        BAILIFERR( GetFileData( aoe, &mhaDecoderConfigurationRecord.mpegh3daConfig, offset, sizeof(mhaDecoderConfigurationRecord.mpegh3daConfigLength*8), &offset ) );
+   
+	
+        FieldMustBe( mhaDecoderConfigurationRecord.configurationVersion , 1, "ConfigurationVersion must be %d not %d" );
+	if(vg.audioChValue != mhaDecoderConfigurationRecord.referenceChannelLayout)
+	{
+	   errprint( "The referenceChannelLayout is not matching  with out of box AudioChannelConfiguration value\n" );
+	}
+	
+	// All done
+	aoe->aoeflags |= kAtomValidated;
+
+bail:
+	return err;
+
+}
 
 
 //==========================================================================================
@@ -3269,7 +3400,7 @@ OSErr Validate_cprt_Atom( atomOffsetEntry *aoe, void *refcon )
 		else {
 			int ix;
 			
-			// ¥¥ clf -- The right solution is probably to generate "\uNNNN" for Unicode characters not in the range 0-0x7f. That
+			// ï¿½ï¿½ clf -- The right solution is probably to generate "\uNNNN" for Unicode characters not in the range 0-0x7f. That
 			// will require the array be 5 times as large in the worst case.
 			utf8noticeP = (char *)calloc(numChars, 1);
 			pASCII= utf8noticeP;
